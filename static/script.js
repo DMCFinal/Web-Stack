@@ -10,6 +10,10 @@ eventSrc.onmessage = function(e) {
 var tooltip = d3.select("div.tooltip");
 var tooltip_title = d3.select("#title");
 var tooltip_category = d3.select("#cat");
+var tooltip_address = d3.select("#address");
+var tooltip_checkin = d3.select("#checkin");
+var tooltip_time = d3.select("#time");
+var tooltip_hour = d3.select("#hour");
 
 
 var map = L.map('map').setView([22.539029, 114.062076], 16);
@@ -32,10 +36,13 @@ L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
 
 //create variables to store a reference to svg and g elements
 
-d3.select(map.getPanes().overlayPane).on("click", showLines);
+//d3.select(map.getPanes().overlayPane).on("click", showLines);
+
+var svg_overlay = d3.select(map.getPanes().overlayPane).append("svg");
+var g_overlay = svg_overlay.append("g").attr("class", "leaflet-zoom-hide");
 
 var svg = d3.select(map.getPanes().overlayPane).append("svg");
-var g_line = svg.append("g").attr("class", "leaflet-zoom-hide");
+//var g_line = svg.append("g").attr("class", "leaflet-zoom-hide");
 var g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
 function projectPoint(lat, lng) {
@@ -55,6 +62,8 @@ function remap(value, min1, max1, min2, max2){
 	return (min2) + ((value) - (min1)) * ((max2) - (min2)) / ((max1) - (min1));
 }
 
+
+	
 function updateData(){
 
 	var mapBounds = map.getBounds();
@@ -63,47 +72,93 @@ function updateData(){
 	var lng1 = mapBounds["_southWest"]["lng"];
 	var lng2 = mapBounds["_northEast"]["lng"];
 
-	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2
+	var cell_size = 20;
+	var w = window.innerWidth;
+	var h = window.innerHeight;
+
+	var checked = document.getElementById("heatmap").checked
+
+	//request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2
+	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size + "&analysis=" + checked
 
 	console.log(request);
 
 	g.selectAll("circle").remove()
-	g_line.selectAll("line").remove()
+	//g_line.selectAll("line").remove()
 
   	d3.json(request, function(data) {
 
 		//create placeholder circle geometry and bind it to data
 		var circles = g.selectAll("circle").data(data.features);
+		console.log(data.time)
 
-		circles.enter()
-			.append("circle")
-			.on("mouseover", function(d){
-				tooltip.style("visibility", "visible");
-				tooltip_title.text(d.properties.name);
-				tooltip_category.text("Category: " + d.properties.cat);
-			})
-			.on("mousemove", function(){
-				tooltip.style("top", (d3.event.pageY-10)+"px")
-				tooltip.style("left",(d3.event.pageX+10)+"px");
-			})
-			.on("mouseout", function(){
-				tooltip.style("visibility", "hidden");
-			})
-			.on("click", function(d){
-				hideLines(d.id);
-			})
-			.attr("r", 7)
-		;
+		if (data.time == "07" || data.time == "08"){
 
-		var lines = g_line.selectAll("line").data(data.lines);
-		lines.enter().append("line")
+			circles.enter()
+				.append("circle")
+				.on("mouseover", function(d){
+					tooltip.style("visibility", "visible");
+					tooltip_title.text(d.properties.name);
+					tooltip_category.text("Category: " + d.properties.cat);
+					tooltip_address.text("Address: " + d.properties.address);
+					tooltip_checkin.text("#checkin: " + d.properties.checkin);
+					tooltip_time.text("Time: " + d.properties.time);
+					tooltip_hour.text("Hour: " + d.properties.hour);
+
+				})
+				.on("mousemove", function(){
+					tooltip.style("top", (d3.event.pageY-10)+"px")
+					tooltip.style("left",(d3.event.pageX+10)+"px");
+				})
+				.on("mouseout", function(){
+					tooltip.style("visibility", "hidden");
+				})
+				.on("click", function(d){
+					hideLines(d.id);
+				})
+				.attr("r", 7)
+			;
+		};
+		
+
+		// var lines = g_line.selectAll("line").data(data.lines);
+		// lines.enter().append("line")
 
 		// call function to update geometry
 		update();
 		map.on("viewreset", update);
 
+		if (checked == true){
+
+			var topleft = projectPoint(lat2, lng1);
+
+
+			console.log(lat2);
+
+
+			svg_overlay.attr("width", w)
+				.attr("height", h)
+				.style("left", topleft.x + "px")
+				.style("top", topleft.y + "px");
+
+			//create placeholder rect geometry and bind it to data
+			var rectangles = g_overlay.selectAll("rect").data(data.analysis);
+			rectangles.enter().append("rect");
+
+			rectangles
+				.attr("x", function(d) { return d.x; })
+				.attr("y", function(d) { return d.y; })
+				.attr("width", function(d) { return d.width; })
+				.attr("height", function(d) { return d.height; })
+		    	.attr("fill-opacity", ".2")
+		    	.attr("fill", function(d) { return "hsl(" + Math.floor((1-d.value)*250) + ", 100%, 50%)"; });
+		
+		};
+
 		// function to update the data
 		function update() {
+
+			g_overlay.selectAll("rect").remove()
 
 			// get bounding box of data
 		    var bounds = path.bounds(data),
@@ -119,110 +174,111 @@ function updateData(){
 		        .style("top", (topLeft[1] - buffer) + "px");
 
 		    g   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
-		    g_line.attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
+		    //g_line.attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
 
 		    // update circle position and size
 		    circles
 		    	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
 		    	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
+		    	.attr("r", function(d) { return Math.pow(d.properties.checkin,.3); });
     		;
-
-			lines
-				.attr("x1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).x; })
-				.attr("y1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).y; })
-				.attr("x2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).x; })
-				.attr("y2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).y; })
-			;
+			
+			// lines
+			// 	.attr("x1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).x; })
+			// 	.attr("y1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).y; })
+			// 	.attr("x2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).x; })
+			// 	.attr("y2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).y; })
+			// ;
+			
 		};
+		
+		// function hideLines(id) {
 
-		function hideLines(id) {
+		// 	markerClicked = true;
 
-			markerClicked = true;
+		// 	var others = [id];
 
-			var others = [id];
+		// 	lines.transition()
+		// 		.style("stroke-opacity", .5)
+		// 		.style("stroke-width", function(d) { 
+		// 			if (d.from == id ){
+		// 				others.push(d.to);
+		// 				return 3;
+		// 			};
+		// 			if(d.to == id ){
+		// 				others.push(d.from);
+		// 				return 3;
+		// 			}; 
+		// 		})
+		// 		.style("visibility", function(d) { 
+		// 			if (d.from == id || d.to == id){
+		// 				return "visible";
+		// 			}else{
+		// 				return "hidden";
+		// 			}; 
+		// 		})
+		// 	;
 
-			lines.transition()
-				.style("stroke-opacity", .5)
-				.style("stroke-width", function(d) { 
-					if (d.from == id ){
-						others.push(d.to);
-						return 3;
-					};
-					if(d.to == id ){
-						others.push(d.from);
-						return 3;
-					}; 
-				})
-				.style("visibility", function(d) { 
-					if (d.from == id || d.to == id){
-						return "visible";
-					}else{
-						return "hidden";
-					}; 
-				})
-			;
+		// 	var minVal = 1000000000;
+		// 	var maxVal = 0;
 
-			var minVal = 1000000000;
-			var maxVal = 0;
+		// 	circles
+		// 		.style("visibility", function(d) { 
 
-			circles
-				.style("visibility", function(d) { 
+		// 			var val = d.properties.score;
 
-					var val = d.properties.score;
+		// 			for (var i = 0; i < others.length; i++){
+		// 				if (d.id == others[i]){
+		// 					if (val > maxVal){
+		// 						maxVal = val;
+		// 					}								
+		// 					if (val < minVal){
+		// 						minVal = val;
+		// 					}
 
-					for (var i = 0; i < others.length; i++){
-						if (d.id == others[i]){
-							if (val > maxVal){
-								maxVal = val;
-							}								
-							if (val < minVal){
-								minVal = val;
-							}
+		// 					return "visible";
+		// 				}
+		// 			}
+		// 			return "hidden";
+		// 		})
+		// 	;
 
-							return "visible";
-						}
-					}
-					return "hidden";
-				})
-			;
-
-			circles.transition()
-				.attr("r", function(d) { 
-					for (var i = 0; i < others.length; i++){
-						if (d.id == others[i]){
-							return remap(d.properties.score, minVal, maxVal, 10, 30);
-						}
-					}
-					return 7;
-				})
-			;
-		};
-	});
-
+		// 	circles.transition()
+		// 		.attr("r", function(d) { 
+		// 			for (var i = 0; i < others.length; i++){
+		// 				if (d.id == others[i]){
+		// 					return remap(d.properties.score, minVal, maxVal, 10, 30);
+		// 				}
+		// 			}
+		// 			return 7;
+		// 		})
+		// 	;
+		// };
+});
 };
 
 
 
+// function showLines() {
 
-function showLines() {
+// 	if (markerClicked == true){
+// 		markerClicked = false
+// 		return
+// 	}
 
-	if (markerClicked == true){
-		markerClicked = false
-		return
-	}
+// 	g_line.selectAll("line")
+// 		.transition()
+// 		.style("stroke-opacity", .2)
+// 		.style("stroke-width", 1)
+// 		.style("visibility", "visible")
+// 	;
 
-	g_line.selectAll("line")
-		.transition()
-		.style("stroke-opacity", .2)
-		.style("stroke-width", 1)
-		.style("visibility", "visible")
-	;
+// 	g.selectAll("circle")
+// 		.transition()
+// 		.attr("r", 7)
+// 		.style("visibility", "visible")
+// 	;
+// };
 
-	g.selectAll("circle")
-		.transition()
-		.attr("r", 7)
-		.style("visibility", "visible")
-	;
-};
 
 updateData();
