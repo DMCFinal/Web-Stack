@@ -8,12 +8,13 @@ eventSrc.onmessage = function(e) {
 };
 
 var tooltip = d3.select("div.tooltip");
-var tooltip_title = d3.select("#title");
-var tooltip_category = d3.select("#cat");
-var tooltip_address = d3.select("#address");
-var tooltip_checkin = d3.select("#checkin");
+// var tooltip_title = d3.select("#title");
+// var tooltip_category = d3.select("#cat");
+// var tooltip_address = d3.select("#address");
+// var tooltip_checkin = d3.select("#checkin");
 var tooltip_time = d3.select("#time");
 var tooltip_hour = d3.select("#hour");
+var tooltip_day = d3.select("#day");
 
 
 var map = L.map('map').setView([22.539029, 114.062076], 16);
@@ -78,8 +79,14 @@ function updateData(){
 
 	var checked = document.getElementById("heatmap").checked
 
+	var dropdownDay_object = document.getElementById("dropdownDay");
+	var dropdownDay = dropdownDay_object.options[dropdownDay_object.selectedIndex].value;
+
+	var dropdownTime_object = document.getElementById("dropdownTime");
+	var dropdownTime = dropdownTime_object.options[dropdownTime_object.selectedIndex].value;
+
 	//request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2
-	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size + "&analysis=" + checked
+  	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size + "&analysis=" + checked + "&dayOfWeek=" + dropdownDay +"&timeOfDay=" + dropdownTime
 
 	console.log(request);
 
@@ -92,17 +99,18 @@ function updateData(){
 		var circles = g.selectAll("circle").data(data.features);
 		console.log(data.time)
 
-		if (data.time == "07" || data.time == "08"){
+		//if (data.time == "07" || data.time == "08"){
 
 			circles.enter()
 				.append("circle")
 				.on("mouseover", function(d){
 					tooltip.style("visibility", "visible");
-					tooltip_title.text(d.properties.name);
-					tooltip_category.text("Category: " + d.properties.cat);
-					tooltip_address.text("Address: " + d.properties.address);
-					tooltip_checkin.text("#checkin: " + d.properties.checkin);
+					// tooltip_title.text(d.properties.name);
+					// tooltip_category.text("Category: " + d.properties.cat);
+					// tooltip_address.text("Address: " + d.properties.address);
+					// tooltip_checkin.text("#checkin: " + d.properties.checkin);
 					tooltip_time.text("Time: " + d.properties.time);
+					tooltip_day.text(d.properties.day);
 					tooltip_hour.text("Hour: " + d.properties.hour);
 
 				})
@@ -118,7 +126,7 @@ function updateData(){
 				})
 				.attr("r", 7)
 			;
-		};
+		//};
 		
 
 		// var lines = g_line.selectAll("line").data(data.lines);
@@ -180,7 +188,7 @@ function updateData(){
 		    circles
 		    	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
 		    	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
-		    	.attr("r", function(d) { return Math.pow(d.properties.checkin,.3); });
+		    	//.attr("r", function(d) { return Math.pow(d.properties.checkin,.3); });
     		;
 			
 			// lines

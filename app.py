@@ -8,6 +8,7 @@ import time
 import sys
 import random
 import math
+import datetime
 
 import pyorient
 
@@ -78,6 +79,9 @@ def getData():
 
 	analysis = request.args.get('analysis')
 
+	dropdownDay = request.args.get('dayOfWeek')
+	dropdownTime = request.args.get('timeOfDay')
+
 	print "received coordinates: [" + lat1 + ", " + lat2 + "], [" + lng1 + ", " + lng2 + "]"
 	
 	client = pyorient.OrientDB("localhost", 2424)
@@ -93,7 +97,7 @@ def getData():
 		print "database [" + db_name + "] does not exist! session ending..."
 		sys.exit()
 
-	query = 'SELECT FROM Place WHERE lat BETWEEN {} AND {} AND lng BETWEEN {} AND {}'
+	query = 'SELECT FROM Checkin WHERE lat BETWEEN {} AND {} AND lng BETWEEN {} AND {} AND cat_1 = "Food" AND DOW =' + str(dropdownDay) + ' AND TOD = ' + str(dropdownTime)
 
 	records = client.command(query.format(lat1, lat2, lng1, lng2))
 
@@ -149,17 +153,29 @@ def getData():
 
 		feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
 		feature["id"] = record._rid
-		feature["properties"]["name"] = record.title
-		feature["properties"]["address"] = record.address
-		feature["properties"]["checkin"] = record.checkin_num
+		#feature["properties"]["name"] = record.title
+		#feature["properties"]["address"] = record.address
+		#feature["properties"]["checkin"] = record.checkin_num
 		feature["properties"]["time"] = str(record.time)
 
-		print str(record.time)
+		#print str(record.time)
 		dateTimeList = str(record.time).split()
 		time = dateTimeList[1]
 		timeList = time.split(':')
 		hour = timeList[0]
 		feature["properties"]["hour"] = str(hour)
+		feature["properties"]["dayTime"] = str(time)
+
+		date = dateTimeList[0]
+		dateList = date.split('-')
+		month = str(dateList[1])
+		day = int(dateList[2])
+
+		#calculating which day in the week
+		seven = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+		print record.time.weekday()
+		dateOfWeek = seven[record.time.weekday()]
+		feature["properties"]["day"] = dateOfWeek
 
 		feature["geometry"]["coordinates"] = [record.lat, record.lng]
 
