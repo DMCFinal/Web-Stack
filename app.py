@@ -79,6 +79,8 @@ def getData():
 
 	analysis = request.args.get('analysis')
 
+	# Setting up global variables that would be used in the query
+	# Getting "day of week" and "time of day" information selected from the dropdown menu on the client side
 	dropdownDay = request.args.get('dayOfWeek')
 	dropdownTime = request.args.get('timeOfDay')
 
@@ -97,75 +99,30 @@ def getData():
 		print "database [" + db_name + "] does not exist! session ending..."
 		sys.exit()
 
+	# Set the checkin category to "Food"
+	# Query data on the selected "day of week" and "time of day" from the weibo database
 	query = 'SELECT FROM Checkin WHERE lat BETWEEN {} AND {} AND lng BETWEEN {} AND {} AND cat_1 = "Food" AND DOW =' + str(dropdownDay) + ' AND TOD = ' + str(dropdownTime)
 
 	records = client.command(query.format(lat1, lat2, lng1, lng2))
 
-	#random.shuffle(records)
-	#records = records[:100]
-
 	numListings = len(records)
-	print 'received ' + str(numListings) + ' records'
-
-	placesDict = {}
-	scoreDict = {}
-
-	for place in records:
-		placesDict[place._rid] = {'lat': place.lat, 'lng': place.lng}
-		scoreDict[place._rid] = 0
-
-
-        for i, rid in enumerate(placesDict.keys()):
-
-		q.put('processing ' + str(i) + ' out of ' + str(numListings) + ' places...')
-
-		s = "SELECT * FROM (TRAVERSE in(Checkin) FROM {}) WHERE @class = 'User'"
-
-		people = client.command(s.format(rid))
-		uids = [person.uid for person in people]
-
-		placesDict[rid]['users'] = set(uids)
-
-	q.put('matching records...')
+	
+	#print 'received ' + str(numListings) + ' records'
+	q.put('received ' + str(numListings) + ' records')
         
-	'''
-	lines = []
-
-	for place1 in placesDict.keys():
-		users1 = placesDict[place1]['users']
-		lat1 = placesDict[place1]['lat']
-		lng1 = placesDict[place1]['lng']
-		placesDict.pop(place1)
-		for place2 in placesDict.keys():
-			if len(users1 & placesDict[place2]['users']) > 1:
-				scoreDict[place1] += 1
-				scoreDict[place2] += 1
-				lines.append({'from': place1, 'to': place2, 'coordinates': [lat1, lng1, placesDict[place2]['lat'], placesDict[place2]['lng']]})
-
-	'''
+	
 	client.db_close()
         
 	output = {"type":"FeatureCollection","features":[],"time":[]}
 
 	for record in records:
-		#if scoreDict[record._rid] < 1:
-			#continue
 
 		feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
 		feature["id"] = record._rid
-		#feature["properties"]["name"] = record.title
-		#feature["properties"]["address"] = record.address
-		#feature["properties"]["checkin"] = record.checkin_num
 		feature["properties"]["time"] = str(record.time)
+		feature["geometry"]["coordinates"] = [record.lat, record.lng]
 
-		#print str(record.time)
 		dateTimeList = str(record.time).split()
-		time = dateTimeList[1]
-		timeList = time.split(':')
-		hour = timeList[0]
-		feature["properties"]["hour"] = str(hour)
-		feature["properties"]["dayTime"] = str(time)
-
 		date = dateTimeList[0]
 		dateList = date.split('-')
 		month = str(dateList[1])
@@ -173,19 +130,16 @@ def getData():
 
 		#calculating which day in the week
 		seven = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-		print record.time.weekday()
-		dateOfWeek = seven[record.time.weekday()]
-		feature["properties"]["day"] = dateOfWeek
-
-		feature["geometry"]["coordinates"] = [record.lat, record.lng]
+		feature["properties"]["day"] = seven[record.time.weekday()]
 
 		output["features"].append(feature)
-		output["time"].append(str(hour))
+
 
 	if analysis == "false":
-		q.put('idle')
+		#q.put('idle')
 		return json.dumps(output)
 
+	#Calculating the heat map
 	q.put('starting analysis...')
 
 	output["analysis"] = []
@@ -205,7 +159,6 @@ def getData():
 		pos_x = int(remap(record.lng, lng1, lng2, 0, numW))
 		pos_y = int(remap(record.lat, lat1, lat2, numH, 0))
 
-		#TRY TESTING DIFFERENT VALUES FOR THE SPREAD FACTOR TO SEE HOW THE HEAT MAP VISUALIZATION CHANGES
 		spread = 12
 
 		for j in range(max(0, (pos_y-spread)), min(numH, (pos_y+spread))):
@@ -229,8 +182,6 @@ def getData():
 
 			output["analysis"].append(newItem)
 
-
-	#output["lines"] = lines
 
 	q.put('idle')
 	return json.dumps(output)

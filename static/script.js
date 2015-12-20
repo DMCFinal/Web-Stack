@@ -1,5 +1,4 @@
 
-
 var eventOutputContainer = document.getElementById("message");
 var eventSrc = new EventSource("/eventSource");
 
@@ -7,43 +6,20 @@ eventSrc.onmessage = function(e) {
 	eventOutputContainer.innerHTML = e.data;
 };
 
+//Setting up global variables to show time and day on the tooltip
 var tooltip = d3.select("div.tooltip");
-// var tooltip_title = d3.select("#title");
-// var tooltip_category = d3.select("#cat");
-// var tooltip_address = d3.select("#address");
-// var tooltip_checkin = d3.select("#checkin");
 var tooltip_time = d3.select("#time");
-var tooltip_hour = d3.select("#hour");
 var tooltip_day = d3.select("#day");
 
-
-var map = L.map('map').setView([22.539029, 114.062076], 16);
+//Setting the map central point location and zoom level so that the scope of downtown Shenzhen show up upon opening the web page
+var map = L.map('map').setView([22.539029, 114.062076], 13);
 
 var markerClicked = false;
 	
-
-//this is the OpenStreetMap tile implementation
-L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-	attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-}).addTo(map);
-
-//uncomment for Mapbox implementation, and supply your own access token
-
-// L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_token={accessToken}', {
-// 	attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
-// 	mapid: 'mapbox.light',
-// 	accessToken: [INSERT YOUR TOKEN HERE!]
-// }).addTo(map);
-
-//create variables to store a reference to svg and g elements
-
-//d3.select(map.getPanes().overlayPane).on("click", showLines);
-
 var svg_overlay = d3.select(map.getPanes().overlayPane).append("svg");
 var g_overlay = svg_overlay.append("g").attr("class", "leaflet-zoom-hide");
 
 var svg = d3.select(map.getPanes().overlayPane).append("svg");
-//var g_line = svg.append("g").attr("class", "leaflet-zoom-hide");
 var g = svg.append("g").attr("class", "leaflet-zoom-hide");
 
 function projectPoint(lat, lng) {
@@ -63,8 +39,6 @@ function remap(value, min1, max1, min2, max2){
 	return (min2) + ((value) - (min1)) * ((max2) - (min2)) / ((max1) - (min1));
 }
 
-
-	
 function updateData(){
 
 	var mapBounds = map.getBounds();
@@ -79,40 +53,47 @@ function updateData(){
 
 	var checked = document.getElementById("heatmap").checked
 
+	//Setting up variables containing "day of week" and "time of day" by getting values from the html file
 	var dropdownDay_object = document.getElementById("dropdownDay");
 	var dropdownDay = dropdownDay_object.options[dropdownDay_object.selectedIndex].value;
 
 	var dropdownTime_object = document.getElementById("dropdownTime");
 	var dropdownTime = dropdownTime_object.options[dropdownTime_object.selectedIndex].value;
 
-	//request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2
+	//Get client information and send to the server
   	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size + "&analysis=" + checked + "&dayOfWeek=" + dropdownDay +"&timeOfDay=" + dropdownTime
 
 	console.log(request);
 
+	//Set up the basemap to show dark basemap when "time of day" is set to "Evening" or "Night", and light basemap for "Morning" and "Day"
+	if (dropdownTime==0|dropdownTime==3){
+		L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_token={accessToken}', {
+ 		attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+ 		mapid: 'mapbox.dark',
+ 		accessToken: ['pk.eyJ1IjoiZWttaW5vdWdvdSIsImEiOiJjaWk0djNhcWowMWdtdG9rZnE3b3RybWEzIn0.LZVMU9yjc00114OdlzAzxg']
+		 }).addTo(map);
+	}
+	else {
+		L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_token={accessToken}', {
+ 		attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+ 		mapid: 'mapbox.light',
+ 		accessToken: ['pk.eyJ1IjoiZWttaW5vdWdvdSIsImEiOiJjaWk0djNhcWowMWdtdG9rZnE3b3RybWEzIn0.LZVMU9yjc00114OdlzAzxg']
+		 }).addTo(map);
+	}
+
 	g.selectAll("circle").remove()
-	//g_line.selectAll("line").remove()
 
   	d3.json(request, function(data) {
 
 		//create placeholder circle geometry and bind it to data
 		var circles = g.selectAll("circle").data(data.features);
-		console.log(data.time)
-
-		//if (data.time == "07" || data.time == "08"){
 
 			circles.enter()
 				.append("circle")
 				.on("mouseover", function(d){
 					tooltip.style("visibility", "visible");
-					// tooltip_title.text(d.properties.name);
-					// tooltip_category.text("Category: " + d.properties.cat);
-					// tooltip_address.text("Address: " + d.properties.address);
-					// tooltip_checkin.text("#checkin: " + d.properties.checkin);
-					tooltip_time.text("Time: " + d.properties.time);
+					tooltip_time.text(d.properties.time);
 					tooltip_day.text(d.properties.day);
-					tooltip_hour.text("Hour: " + d.properties.hour);
-
 				})
 				.on("mousemove", function(){
 					tooltip.style("top", (d3.event.pageY-10)+"px")
@@ -126,23 +107,16 @@ function updateData(){
 				})
 				.attr("r", 7)
 			;
-		//};
-		
 
-		// var lines = g_line.selectAll("line").data(data.lines);
-		// lines.enter().append("line")
-
-		// call function to update geometry
 		update();
 		map.on("viewreset", update);
 
+		//setting up the heatmap
 		if (checked == true){
 
 			var topleft = projectPoint(lat2, lng1);
 
-
 			console.log(lat2);
-
 
 			svg_overlay.attr("width", w)
 				.attr("height", h)
@@ -182,111 +156,17 @@ function updateData(){
 		        .style("top", (topLeft[1] - buffer) + "px");
 
 		    g   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
-		    //g_line.attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
 
 		    // update circle position and size
 		    circles
 		    	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
 		    	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
-		    	//.attr("r", function(d) { return Math.pow(d.properties.checkin,.3); });
     		;
-			
-			// lines
-			// 	.attr("x1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).x; })
-			// 	.attr("y1", function(d) { return projectPoint(d.coordinates[0], d.coordinates[1]).y; })
-			// 	.attr("x2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).x; })
-			// 	.attr("y2", function(d) { return projectPoint(d.coordinates[2], d.coordinates[3]).y; })
-			// ;
 			
 		};
 		
-		// function hideLines(id) {
-
-		// 	markerClicked = true;
-
-		// 	var others = [id];
-
-		// 	lines.transition()
-		// 		.style("stroke-opacity", .5)
-		// 		.style("stroke-width", function(d) { 
-		// 			if (d.from == id ){
-		// 				others.push(d.to);
-		// 				return 3;
-		// 			};
-		// 			if(d.to == id ){
-		// 				others.push(d.from);
-		// 				return 3;
-		// 			}; 
-		// 		})
-		// 		.style("visibility", function(d) { 
-		// 			if (d.from == id || d.to == id){
-		// 				return "visible";
-		// 			}else{
-		// 				return "hidden";
-		// 			}; 
-		// 		})
-		// 	;
-
-		// 	var minVal = 1000000000;
-		// 	var maxVal = 0;
-
-		// 	circles
-		// 		.style("visibility", function(d) { 
-
-		// 			var val = d.properties.score;
-
-		// 			for (var i = 0; i < others.length; i++){
-		// 				if (d.id == others[i]){
-		// 					if (val > maxVal){
-		// 						maxVal = val;
-		// 					}								
-		// 					if (val < minVal){
-		// 						minVal = val;
-		// 					}
-
-		// 					return "visible";
-		// 				}
-		// 			}
-		// 			return "hidden";
-		// 		})
-		// 	;
-
-		// 	circles.transition()
-		// 		.attr("r", function(d) { 
-		// 			for (var i = 0; i < others.length; i++){
-		// 				if (d.id == others[i]){
-		// 					return remap(d.properties.score, minVal, maxVal, 10, 30);
-		// 				}
-		// 			}
-		// 			return 7;
-		// 		})
-		// 	;
-		// };
 });
 };
-
-
-
-// function showLines() {
-
-// 	if (markerClicked == true){
-// 		markerClicked = false
-// 		return
-// 	}
-
-// 	g_line.selectAll("line")
-// 		.transition()
-// 		.style("stroke-opacity", .2)
-// 		.style("stroke-width", 1)
-// 		.style("visibility", "visible")
-// 	;
-
-// 	g.selectAll("circle")
-// 		.transition()
-// 		.attr("r", 7)
-// 		.style("visibility", "visible")
-// 	;
-// };
 
 
 updateData();
